@@ -157,18 +157,19 @@ export default function SessionPage() {
   };
 
   const getSortedParticipants = (participants: Participant[]): Participant[] => {
-    const sorted = [...participants].sort((a, b) => {
-      // Sort by laps completed (ascending), then by name
-      if (a.lapsCompleted === b.lapsCompleted) {
-        return a.name.localeCompare(b.name);
-      }
-      return a.lapsCompleted - b.lapsCompleted;
-    });
+    // TEMPORARILY DISABLED: Remove sorting to fix data corruption issues
+    // const sorted = [...participants].sort((a, b) => {
+    //   // Sort by laps completed (ascending), then by name
+    //   if (a.lapsCompleted === b.lapsCompleted) {
+    //     return a.name.localeCompare(b.name);
+    //   }
+    //   return a.lapsCompleted - b.lapsCompleted;
+    // });
     
-    console.log('Original participants order:', participants.map(p => ({ id: p.id, name: p.name, laps: p.lapsCompleted })));
-    console.log('Sorted participants order:', sorted.map(p => ({ id: p.id, name: p.name, laps: p.lapsCompleted })));
+    console.log('Participants in original order (no sorting):', participants.map(p => ({ id: p.id, name: p.name, laps: p.lapsCompleted })));
     
-    return sorted;
+    // Return original order without sorting
+    return [...participants];
   };
 
   const copySessionLink = () => {
@@ -342,12 +343,12 @@ export default function SessionPage() {
           {/* Final Results */}
           {session.status === 'finished' && (
             <div className="mt-8 p-6 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">🏆 Final Results</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">🏆 Final Results (Original Order)</h2>
               <div className="space-y-2">
-                {sortedParticipants.map((participant, index) => (
+                {sortedParticipants.map((participant) => (
                   <div key={participant.id} className="flex justify-between items-center">
                     <span className="font-medium">
-                      #{index + 1} {participant.name}
+                      {participant.name}
                     </span>
                     <span className="text-gray-600">
                       {participant.lapsCompleted} laps completed
