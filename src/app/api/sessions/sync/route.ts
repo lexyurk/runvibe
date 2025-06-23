@@ -38,6 +38,10 @@ export async function PUT(request: NextRequest) {
     const { sessionId, participants, status, endTime } = body;
     
     console.log('Session sync: sessionId:', sessionId, 'status:', status);
+    if (status === 'finished') {
+      console.log('🏁 RACE COMPLETION SYNC: endTime:', endTime);
+      console.log('🏁 RACE COMPLETION SYNC: finished participants:', participants.filter(p => p.finished).length, '/', participants.length);
+    }
     console.log('Session sync: participants:', participants.map(p => ({ id: p.id, name: p.name, laps: p.lapsCompleted, finished: p.finished })));
 
     // Fetch current session to preserve other data
@@ -54,6 +58,11 @@ export async function PUT(request: NextRequest) {
       status,
       endTime: endTime || currentSession.endTime,
     };
+
+    if (status === 'finished' && !updatedSession.endTime) {
+      console.error('🏁 RACE COMPLETION ERROR: No endTime provided for finished race');
+      return NextResponse.json({ error: 'endTime is required when finishing race' }, { status: 400 });
+    }
 
     console.log('Session sync: Saving updated session with', participants.length, 'participants');
     console.log('Session sync: Participants being saved:', participants.map(p => ({ id: p.id, name: p.name, laps: p.lapsCompleted, finished: p.finished, finishTime: p.finishTime })));
@@ -84,6 +93,7 @@ export async function PUT(request: NextRequest) {
     // Check if the saved data matches what we intended to save
     const participantCountMatch = verificationSession.participants.length === participants.length;
     const statusMatch = verificationSession.status === status;
+    const endTimeMatch = verificationSession.endTime === updatedSession.endTime;
     
     if (!participantCountMatch) {
       console.error('Session sync: MISMATCH - Participant count:', { expected: participants.length, actual: verificationSession.participants.length });
@@ -91,6 +101,10 @@ export async function PUT(request: NextRequest) {
     
     if (!statusMatch) {
       console.error('Session sync: MISMATCH - Status:', { expected: status, actual: verificationSession.status });
+    }
+
+    if (!endTimeMatch && status === 'finished') {
+      console.error('🏁 Session sync: END TIME MISMATCH:', { expected: updatedSession.endTime, actual: verificationSession.endTime });
     }
 
     // Detailed comparison of participant data
@@ -109,8 +123,13 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    if (participantCountMatch && statusMatch) {
+    const allChecksPass = participantCountMatch && statusMatch && (status !== 'finished' || endTimeMatch);
+    
+    if (allChecksPass) {
       console.log('Session sync: ✅ Data verification PASSED - all data saved correctly');
+      if (status === 'finished') {
+        console.log('🏁 Race completion sync SUCCESSFUL!');
+      }
     } else {
       console.error('Session sync: ❌ Data verification FAILED - data corruption detected');
       return NextResponse.json({ error: 'Data verification failed after save' }, { status: 500 });

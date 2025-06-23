@@ -177,11 +177,16 @@ export default function SessionPage() {
       // Check if all participants are finished
       const allFinished = updatedSession.participants.every(p => p.finished);
       if (allFinished && updatedSession.status === 'running') {
+        console.log('🏁 ALL PARTICIPANTS FINISHED! Setting race status to finished');
         updatedSession.status = 'finished';
         updatedSession.endTime = new Date().toISOString();
+        console.log('🏁 Race end time set to:', updatedSession.endTime);
       }
 
       console.log('Local state updated - participant:', participant.name, 'laps:', participant.lapsCompleted, 'finished:', participant.finished);
+      if (allFinished) {
+        console.log('🏁 About to sync race completion to server with status:', updatedSession.status, 'endTime:', updatedSession.endTime);
+      }
       
       // 2. UPDATE UI IMMEDIATELY
       setSession(updatedSession);
