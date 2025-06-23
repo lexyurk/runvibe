@@ -324,10 +324,11 @@ export default function SessionPage() {
             </div>
           </div>
 
-          {/* Participants */}
-          <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Participants</h2>
-            {sortedParticipants.map((participant, index) => {
+          {/* Participants - Only show during setup and running states */}
+          {session.status !== 'finished' && (
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Participants</h2>
+              {sortedParticipants.map((participant, index) => {
               console.log(`Rendering participant ${index + 1}: ${participant.name} (ID: ${participant.id}) with ${participant.lapsCompleted} laps`);
               return (
                 <div
@@ -398,6 +399,7 @@ export default function SessionPage() {
               );
             })}
           </div>
+          )}
 
           {/* Final Results Leaderboard */}
           {session.status === 'finished' && (
