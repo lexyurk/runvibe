@@ -35,7 +35,8 @@ async function updateParticipantWithRetry(sessionId: string, participantId: stri
     }
     
     console.log('Participant PUT: Current session status:', session.status);
-    console.log('Participant PUT: Current participants:', session.participants.map(p => ({ name: p.name, laps: p.lapsCompleted })));
+    console.log('Participant PUT: Current participants (with IDs):', session.participants.map(p => ({ id: p.id, name: p.name, laps: p.lapsCompleted })));
+    console.log('Participant PUT: Participants array length:', session.participants.length);
 
     // Find and update participant
     const participantIndex = session.participants.findIndex(p => p.id === participantId);
@@ -70,15 +71,29 @@ async function updateParticipantWithRetry(sessionId: string, participantId: stri
     
     console.log(`Participant PUT: Attempt ${attempt} - Updated participant laps from ${originalLaps} to ${participant.lapsCompleted}`);
     console.log('Participant PUT: Final session status before save:', session.status);
+    console.log('Participant PUT: Final session participants before save:', session.participants.map(p => ({ id: p.id, name: p.name, laps: p.lapsCompleted })));
 
     try {
       // Store updated session
-      await put(`sessions/${sessionId}.json`, JSON.stringify(session), {
+      const jsonToSave = JSON.stringify(session);
+      console.log('Participant PUT: JSON being saved length:', jsonToSave.length);
+      
+      await put(`sessions/${sessionId}.json`, jsonToSave, {
         access: 'public',
         allowOverwrite: true,
       });
       
       console.log(`Participant PUT: Attempt ${attempt} - Session saved successfully`);
+      
+      // Verify the data after save by re-fetching
+      const verifySession = await fetchSession(sessionId);
+      if (verifySession) {
+        console.log('Participant PUT: Verification - Re-fetched session participants:', verifySession.participants.map(p => ({ id: p.id, name: p.name, laps: p.lapsCompleted })));
+        if (verifySession.participants.length !== session.participants.length) {
+          console.error('Participant PUT: WARNING - Participant count mismatch after save!');
+        }
+      }
+      
       return session;
     } catch (error) {
       console.error(`Participant PUT: Attempt ${attempt} failed to save:`, error);

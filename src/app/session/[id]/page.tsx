@@ -135,8 +135,12 @@ export default function SessionPage() {
 
       const { session: updatedSession } = await response.json();
       console.log('Participant updated, new session status:', updatedSession.status);
-      console.log('Updated session participants:', updatedSession.participants.map((p: Participant) => ({ name: p.name, laps: p.lapsCompleted, finished: p.finished })));
+      console.log('Updated session participants:', updatedSession.participants.map((p: Participant) => ({ id: p.id, name: p.name, laps: p.lapsCompleted, finished: p.finished })));
       console.log('Updated participant final state:', updatedSession.participants.find((p: Participant) => p.id === participantId));
+      
+      // Double-check that the updated session has the right data
+      console.log('Session before state update (original):', session?.participants.map((p: Participant) => ({ id: p.id, name: p.name, laps: p.lapsCompleted })));
+      console.log('Session after server update (new):', updatedSession.participants.map((p: Participant) => ({ id: p.id, name: p.name, laps: p.lapsCompleted })));
       
       setSession(updatedSession);
     } catch (error) {
@@ -153,13 +157,18 @@ export default function SessionPage() {
   };
 
   const getSortedParticipants = (participants: Participant[]): Participant[] => {
-    return [...participants].sort((a, b) => {
+    const sorted = [...participants].sort((a, b) => {
       // Sort by laps completed (ascending), then by name
       if (a.lapsCompleted === b.lapsCompleted) {
         return a.name.localeCompare(b.name);
       }
       return a.lapsCompleted - b.lapsCompleted;
     });
+    
+    console.log('Original participants order:', participants.map(p => ({ id: p.id, name: p.name, laps: p.lapsCompleted })));
+    console.log('Sorted participants order:', sorted.map(p => ({ id: p.id, name: p.name, laps: p.lapsCompleted })));
+    
+    return sorted;
   };
 
   const copySessionLink = () => {
@@ -258,17 +267,19 @@ export default function SessionPage() {
           {/* Participants */}
           <div className="space-y-3">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Participants</h2>
-            {sortedParticipants.map((participant, index) => (
-              <div
-                key={participant.id}
-                className={`flex items-center justify-between p-4 rounded-lg border-2 ${
-                  participant.finished
-                    ? 'bg-green-50 border-green-200'
-                    : session.status === 'running'
-                    ? 'bg-white border-gray-200'
-                    : 'bg-gray-50 border-gray-200'
-                }`}
-              >
+            {sortedParticipants.map((participant, index) => {
+              console.log(`Rendering participant ${index + 1}: ${participant.name} (ID: ${participant.id}) with ${participant.lapsCompleted} laps`);
+              return (
+                <div
+                  key={participant.id}
+                  className={`flex items-center justify-between p-4 rounded-lg border-2 ${
+                    participant.finished
+                      ? 'bg-green-50 border-green-200'
+                      : session.status === 'running'
+                      ? 'bg-white border-gray-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}
+                >
                 <div className="flex items-center gap-4">
                   <div className="text-2xl font-bold text-gray-400 w-8">
                     #{index + 1}
@@ -324,7 +335,8 @@ export default function SessionPage() {
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Final Results */}
