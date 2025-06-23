@@ -5,7 +5,15 @@ import { RunSession, SessionCreateRequest, Participant } from '@/types';
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('Session creation: Starting POST request');
     const body: SessionCreateRequest = await request.json();
+    console.log('Session creation: Request body:', { name: body.name, totalLaps: body.totalLaps, participantCount: body.participantNames?.length });
+    
+    // Validate request
+    if (!body.name || !body.totalLaps || !body.participantNames || body.participantNames.length === 0) {
+      console.error('Session creation: Invalid request body');
+      return NextResponse.json({ error: 'Invalid request data' }, { status: 400 });
+    }
     
     // Create participants
     const participants: Participant[] = body.participantNames.map(name => ({
@@ -13,6 +21,7 @@ export async function POST(request: NextRequest) {
       name,
       lapsCompleted: 0,
       finished: false,
+      finishTime: undefined,
     }));
 
     // Create session
@@ -26,9 +35,11 @@ export async function POST(request: NextRequest) {
     };
 
     // Store in Vercel Blob
-    await put(`sessions/${session.id}.json`, JSON.stringify(session), {
+    console.log('Session creation: Storing session in blob storage');
+    const result = await put(`sessions/${session.id}.json`, JSON.stringify(session), {
       access: 'public',
     });
+    console.log('Session creation: Successfully stored session:', { sessionId: session.id, url: result.url });
 
     return NextResponse.json({ session });
   } catch (error) {
