@@ -66,6 +66,36 @@ export default function SessionPage() {
     }
   };
 
+  // Helper function to sync session to server
+  const syncToServer = async (sessionData: RunSession) => {
+    try {
+      const response = await fetch('/api/sessions/sync', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId,
+          participants: sessionData.participants,
+          status: sessionData.status,
+          endTime: sessionData.endTime,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Server sync error:', errorData);
+        throw new Error('Failed to sync with server');
+      }
+
+      console.log('Successfully synced to server');
+      return true;
+    } catch (error) {
+      console.error('Error syncing to server:', error);
+      return false;
+    }
+  };
+
   const startSession = async () => {
     if (!session) return;
 
@@ -100,6 +130,8 @@ export default function SessionPage() {
   };
 
   const updateParticipant = async (participantId: string, action: 'addLap' | 'finish') => {
+    if (!session) return;
+
     // Prevent concurrent updates for the same participant
     if (updatingParticipants.has(participantId)) {
       console.log('Participant update already in progress, skipping:', participantId);
@@ -110,42 +142,62 @@ export default function SessionPage() {
       // Mark participant as being updated
       setUpdatingParticipants(prev => new Set(prev).add(participantId));
       
-      console.log('Updating participant:', participantId, 'action:', action, 'current session status:', session?.status);
-      console.log('Current participant state before update:', session?.participants.find((p: Participant) => p.id === participantId));
+      console.log('Updating participant locally:', participantId, 'action:', action);
       
-      const response = await fetch('/api/participants', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sessionId,
-          participantId,
-          action,
-        }),
-      });
-
-      console.log('Participant update response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Participant update error:', errorData);
-        throw new Error('Failed to update participant');
+      // 1. UPDATE LOCAL STATE IMMEDIATELY (Optimistic Update)
+      const updatedSession = { ...session };
+      const participantIndex = updatedSession.participants.findIndex(p => p.id === participantId);
+      
+      if (participantIndex === -1) {
+        console.error('Participant not found:', participantId);
+        return;
       }
 
-      const { session: updatedSession } = await response.json();
-      console.log('Participant updated, new session status:', updatedSession.status);
-      console.log('Updated session participants:', updatedSession.participants.map((p: Participant) => ({ id: p.id, name: p.name, laps: p.lapsCompleted, finished: p.finished })));
-      console.log('Updated participant final state:', updatedSession.participants.find((p: Participant) => p.id === participantId));
+      const participant = { ...updatedSession.participants[participantIndex] };
       
-      // Double-check that the updated session has the right data
-      console.log('Session before state update (original):', session?.participants.map((p: Participant) => ({ id: p.id, name: p.name, laps: p.lapsCompleted })));
-      console.log('Session after server update (new):', updatedSession.participants.map((p: Participant) => ({ id: p.id, name: p.name, laps: p.lapsCompleted })));
+      if (action === 'addLap') {
+        // Add a lap if not already finished and hasn't reached total laps
+        if (!participant.finished && participant.lapsCompleted < session.totalLaps) {
+          participant.lapsCompleted += 1;
+          
+          // Mark as finished if reached total laps
+          if (participant.lapsCompleted >= session.totalLaps) {
+            participant.finished = true;
+          }
+        }
+      } else if (action === 'finish') {
+        participant.finished = true;
+      }
+
+      // Update the participant in the array
+      updatedSession.participants[participantIndex] = participant;
+
+      // Check if all participants are finished
+      const allFinished = updatedSession.participants.every(p => p.finished);
+      if (allFinished && updatedSession.status === 'running') {
+        updatedSession.status = 'finished';
+        updatedSession.endTime = new Date().toISOString();
+      }
+
+      console.log('Local state updated - participant:', participant.name, 'laps:', participant.lapsCompleted, 'finished:', participant.finished);
       
+      // 2. UPDATE UI IMMEDIATELY
       setSession(updatedSession);
+      
+      // 3. SYNC TO SERVER IN BACKGROUND
+      const syncSuccess = await syncToServer(updatedSession);
+      
+      if (!syncSuccess) {
+        // Revert to original state on sync error
+        setSession(session);
+        throw new Error('Failed to sync with server');
+      }
+      
     } catch (error) {
       console.error('Error updating participant:', error);
       alert('Failed to update participant');
+      // Revert to original state on error
+      setSession(session);
     } finally {
       // Always remove participant from updating set
       setUpdatingParticipants(prev => {
