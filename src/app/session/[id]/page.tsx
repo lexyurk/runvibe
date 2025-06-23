@@ -4,6 +4,39 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { RunSession, Participant } from '@/types';
 
+// Timer component
+function Timer({ startTime }: { startTime?: string }) {
+  const [elapsed, setElapsed] = useState('00:00:00');
+
+  useEffect(() => {
+    if (!startTime) return;
+
+    const interval = setInterval(() => {
+      const start = new Date(startTime).getTime();
+      const now = new Date().getTime();
+      const diff = now - start;
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setElapsed(
+        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      );
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  if (!startTime) return null;
+
+  return (
+    <div className="text-2xl font-mono font-bold text-green-600 bg-green-50 px-4 py-2 rounded-lg border border-green-200">
+      ⏱️ {elapsed}
+    </div>
+  );
+}
+
 export default function SessionPage() {
   const [session, setSession] = useState<RunSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,6 +100,8 @@ export default function SessionPage() {
 
   const updateParticipant = async (participantId: string, action: 'addLap' | 'finish') => {
     try {
+      console.log('Updating participant:', participantId, 'action:', action, 'current session status:', session?.status);
+      
       const response = await fetch('/api/participants', {
         method: 'PUT',
         headers: {
@@ -79,11 +114,18 @@ export default function SessionPage() {
         }),
       });
 
+      console.log('Participant update response status:', response.status);
+
       if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Participant update error:', errorData);
         throw new Error('Failed to update participant');
       }
 
       const { session: updatedSession } = await response.json();
+      console.log('Participant updated, new session status:', updatedSession.status);
+      console.log('Updated session participants:', updatedSession.participants.map((p: Participant) => ({ name: p.name, laps: p.lapsCompleted, finished: p.finished })));
+      
       setSession(updatedSession);
     } catch (error) {
       console.error('Error updating participant:', error);
@@ -169,7 +211,7 @@ export default function SessionPage() {
 
           {/* Status */}
           <div className="mb-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                 session.status === 'setup' ? 'bg-yellow-100 text-yellow-800' :
                 session.status === 'running' ? 'bg-green-100 text-green-800' :
@@ -178,6 +220,11 @@ export default function SessionPage() {
                 {session.status === 'setup' ? 'Ready to Start' :
                  session.status === 'running' ? 'In Progress' : 'Finished'}
               </span>
+              
+              {session.status === 'running' && session.startTime && (
+                <Timer startTime={session.startTime} />
+              )}
+              
               {session.status === 'setup' && (
                 <button
                   onClick={startSession}

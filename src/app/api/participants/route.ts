@@ -29,11 +29,17 @@ export async function PUT(request: NextRequest) {
   try {
     const body: UpdateParticipantRequest = await request.json();
     const { sessionId, participantId, action } = body;
+    
+    console.log('Participant PUT: sessionId:', sessionId, 'participantId:', participantId, 'action:', action);
 
     const session = await fetchSession(sessionId);
     if (!session) {
+      console.log('Participant PUT: Session not found');
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
+    
+    console.log('Participant PUT: Current session status:', session.status);
+    console.log('Participant PUT: Current participants:', session.participants.map(p => ({ name: p.name, laps: p.lapsCompleted })));
 
     // Find and update participant
     const participantIndex = session.participants.findIndex(p => p.id === participantId);
@@ -60,15 +66,21 @@ export async function PUT(request: NextRequest) {
     // Check if all participants are finished
     const allFinished = session.participants.every(p => p.finished);
     if (allFinished && session.status === 'running') {
+      console.log('Participant PUT: All participants finished, setting session to finished');
       session.status = 'finished';
       session.endTime = new Date().toISOString();
     }
+    
+    console.log('Participant PUT: Final session status before save:', session.status);
+    console.log('Participant PUT: Updated participant state:', session.participants.find(p => p.id === participantId));
 
     // Store updated session
     await put(`sessions/${sessionId}.json`, JSON.stringify(session), {
       access: 'public',
       allowOverwrite: true,
     });
+    
+    console.log('Participant PUT: Session saved successfully');
 
     return NextResponse.json({ session });
   } catch (error) {
