@@ -56,7 +56,7 @@ export async function PUT(request: NextRequest) {
     };
 
     console.log('Session sync: Saving updated session with', participants.length, 'participants');
-    console.log('Session sync: Participants being saved:', participants.map(p => ({ id: p.id, name: p.name, laps: p.lapsCompleted, finished: p.finished })));
+    console.log('Session sync: Participants being saved:', participants.map(p => ({ id: p.id, name: p.name, laps: p.lapsCompleted, finished: p.finished, finishTime: p.finishTime })));
 
     // Store updated session in Vercel Blob
     const result = await put(`sessions/${sessionId}.json`, JSON.stringify(updatedSession), {
@@ -79,7 +79,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to verify session save' }, { status: 500 });
     }
 
-    console.log('Session sync: Verification - Retrieved participants:', verificationSession.participants.map(p => ({ id: p.id, name: p.name, laps: p.lapsCompleted, finished: p.finished })));
+    console.log('Session sync: Verification - Retrieved participants:', verificationSession.participants.map(p => ({ id: p.id, name: p.name, laps: p.lapsCompleted, finished: p.finished, finishTime: p.finishTime })));
     
     // Check if the saved data matches what we intended to save
     const participantCountMatch = verificationSession.participants.length === participants.length;
@@ -104,6 +104,8 @@ export async function PUT(request: NextRequest) {
         console.error(`Session sync: LAP MISMATCH - ${expected.name}: expected ${expected.lapsCompleted}, got ${actual.lapsCompleted}`);
       } else if (actual.finished !== expected.finished) {
         console.error(`Session sync: FINISH MISMATCH - ${expected.name}: expected ${expected.finished}, got ${actual.finished}`);
+      } else if (actual.finishTime !== expected.finishTime) {
+        console.error(`Session sync: FINISH TIME MISMATCH - ${expected.name}: expected ${expected.finishTime}, got ${actual.finishTime}`);
       }
     }
 

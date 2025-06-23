@@ -3,6 +3,7 @@ export interface Participant {
   name: string;
   lapsCompleted: number;
   finished: boolean;
+  finishTime?: string;
 }
 
 export interface RunSession {

@@ -163,10 +163,12 @@ export default function SessionPage() {
           // Mark as finished if reached total laps
           if (participant.lapsCompleted >= session.totalLaps) {
             participant.finished = true;
+            participant.finishTime = new Date().toISOString();
           }
         }
       } else if (action === 'finish') {
         participant.finished = true;
+        participant.finishTime = new Date().toISOString();
       }
 
       // Update the participant in the array
@@ -392,27 +394,135 @@ export default function SessionPage() {
             })}
           </div>
 
-          {/* Final Results */}
+          {/* Final Results Leaderboard */}
           {session.status === 'finished' && (
             <div className="mt-8 p-6 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">🏆 Final Results (Original Order)</h2>
-              <div className="space-y-2">
-                {sortedParticipants.map((participant) => (
-                  <div key={participant.id} className="flex justify-between items-center">
-                    <span className="font-medium">
-                      {participant.name}
-                    </span>
-                    <span className="text-gray-600">
-                      {participant.lapsCompleted} laps completed
-                    </span>
-                  </div>
-                ))}
+              <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">🏆 Final Leaderboard</h2>
+              
+              {/* Leaderboard */}
+              <div className="space-y-3">
+                {sortedParticipants
+                  .filter(p => p.finished)
+                  .sort((a, b) => {
+                    // Sort by laps completed (descending), then by finish time (ascending)
+                    if (a.lapsCompleted !== b.lapsCompleted) {
+                      return b.lapsCompleted - a.lapsCompleted;
+                    }
+                    if (a.finishTime && b.finishTime) {
+                      return new Date(a.finishTime).getTime() - new Date(b.finishTime).getTime();
+                    }
+                    return 0;
+                  })
+                  .map((participant, index) => {
+                    const position = index + 1;
+                    const medal = position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : '';
+                    const bgColor = position === 1 ? 'bg-yellow-100 border-yellow-300' : 
+                                   position === 2 ? 'bg-gray-100 border-gray-300' :
+                                   position === 3 ? 'bg-orange-100 border-orange-300' :
+                                   'bg-white border-gray-200';
+                    
+                    const formatFinishTime = (finishTime?: string, startTime?: string) => {
+                      if (!finishTime || !startTime) return 'N/A';
+                      
+                      const start = new Date(startTime).getTime();
+                      const finish = new Date(finishTime).getTime();
+                      const diff = finish - start;
+                      
+                      const hours = Math.floor(diff / (1000 * 60 * 60));
+                      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                      
+                      if (hours > 0) {
+                        return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                      } else {
+                        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                      }
+                    };
+
+                    return (
+                      <div
+                        key={participant.id}
+                        className={`flex items-center justify-between p-4 rounded-lg border-2 ${bgColor} ${
+                          position <= 3 ? 'shadow-md' : 'shadow-sm'
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-2xl font-bold text-gray-600 w-8">
+                              #{position}
+                            </span>
+                            {medal && <span className="text-2xl">{medal}</span>}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-lg text-gray-900">{participant.name}</h3>
+                            <p className="text-sm text-gray-600">
+                              {participant.lapsCompleted} / {session.totalLaps} laps completed
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="text-right">
+                          <div className="font-mono text-lg font-semibold text-gray-900">
+                            {formatFinishTime(participant.finishTime, session.startTime)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Finished at {participant.finishTime ? new Date(participant.finishTime).toLocaleTimeString() : 'N/A'}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
-              {session.endTime && (
-                <p className="mt-4 text-sm text-gray-600">
-                  Finished at {new Date(session.endTime).toLocaleTimeString()}
-                </p>
+
+              {/* Unfinished participants */}
+              {sortedParticipants.some(p => !p.finished) && (
+                <div className="mt-6 pt-4 border-t border-yellow-200">
+                  <h3 className="text-lg font-semibold text-gray-700 mb-3">Did Not Finish</h3>
+                  <div className="space-y-2">
+                    {sortedParticipants
+                      .filter(p => !p.finished)
+                      .map((participant) => (
+                        <div
+                          key={participant.id}
+                          className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-gray-400 font-medium">DNF</span>
+                            <span className="font-medium text-gray-700">{participant.name}</span>
+                          </div>
+                          <span className="text-gray-600">
+                            {participant.lapsCompleted} / {session.totalLaps} laps
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
               )}
+
+              {/* Race summary */}
+              <div className="mt-6 pt-4 border-t border-yellow-200 text-center">
+                <p className="text-sm text-gray-600">
+                  Race completed at {session.endTime ? new Date(session.endTime).toLocaleTimeString() : 'N/A'}
+                </p>
+                {session.startTime && session.endTime && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Total race duration: {(() => {
+                      const start = new Date(session.startTime).getTime();
+                      const end = new Date(session.endTime).getTime();
+                      const diff = end - start;
+                      const hours = Math.floor(diff / (1000 * 60 * 60));
+                      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                      
+                      if (hours > 0) {
+                        return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                      } else {
+                        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                      }
+                    })()}
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>
