@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put } from '@vercel/blob';
+import { put, list } from '@vercel/blob';
 import { RunSession } from '@/types';
 
 // Helper function to fetch session from Vercel Blob
 async function fetchSession(sessionId: string): Promise<RunSession | null> {
   try {
-    // Use blob URL directly for Vercel Blob storage
-    const blobUrl = `https://blob.vercel-storage.com/sessions/${sessionId}.json`;
-    const response = await fetch(blobUrl);
+    // Use Vercel Blob list API to find the session file
+    const { blobs } = await list({
+      prefix: `sessions/${sessionId}.json`,
+      limit: 1,
+    });
+    
+    if (blobs.length === 0) {
+      return null;
+    }
+    
+    // Fetch the session data from the blob URL
+    const response = await fetch(blobs[0].url);
     if (!response.ok) return null;
     return await response.json();
   } catch (error) {
