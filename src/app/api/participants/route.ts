@@ -25,17 +25,13 @@ async function fetchSession(sessionId: string): Promise<RunSession | null> {
   }
 }
 
-export async function PUT(request: NextRequest) {
-  try {
-    const body: UpdateParticipantRequest = await request.json();
-    const { sessionId, participantId, action } = body;
+async function updateParticipantWithRetry(sessionId: string, participantId: string, action: 'addLap' | 'finish', maxRetries = 3): Promise<RunSession> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    console.log(`Participant PUT: Attempt ${attempt}/${maxRetries} for participant ${participantId}`);
     
-    console.log('Participant PUT: sessionId:', sessionId, 'participantId:', participantId, 'action:', action);
-
     const session = await fetchSession(sessionId);
     if (!session) {
-      console.log('Participant PUT: Session not found');
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      throw new Error('Session not found');
     }
     
     console.log('Participant PUT: Current session status:', session.status);
@@ -44,10 +40,11 @@ export async function PUT(request: NextRequest) {
     // Find and update participant
     const participantIndex = session.participants.findIndex(p => p.id === participantId);
     if (participantIndex === -1) {
-      return NextResponse.json({ error: 'Participant not found' }, { status: 404 });
+      throw new Error('Participant not found');
     }
 
     const participant = session.participants[participantIndex];
+    const originalLaps = participant.lapsCompleted;
 
     if (action === 'addLap') {
       // Add a lap if not already finished and hasn't reached total laps
@@ -71,17 +68,40 @@ export async function PUT(request: NextRequest) {
       session.endTime = new Date().toISOString();
     }
     
+    console.log(`Participant PUT: Attempt ${attempt} - Updated participant laps from ${originalLaps} to ${participant.lapsCompleted}`);
     console.log('Participant PUT: Final session status before save:', session.status);
-    console.log('Participant PUT: Updated participant state:', session.participants.find(p => p.id === participantId));
 
-    // Store updated session
-    await put(`sessions/${sessionId}.json`, JSON.stringify(session), {
-      access: 'public',
-      allowOverwrite: true,
-    });
+    try {
+      // Store updated session
+      await put(`sessions/${sessionId}.json`, JSON.stringify(session), {
+        access: 'public',
+        allowOverwrite: true,
+      });
+      
+      console.log(`Participant PUT: Attempt ${attempt} - Session saved successfully`);
+      return session;
+    } catch (error) {
+      console.error(`Participant PUT: Attempt ${attempt} failed to save:`, error);
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      // Wait a bit before retrying
+      await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+    }
+  }
+  
+  throw new Error('Max retries exceeded');
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body: UpdateParticipantRequest = await request.json();
+    const { sessionId, participantId, action } = body;
     
-    console.log('Participant PUT: Session saved successfully');
+    console.log('Participant PUT: sessionId:', sessionId, 'participantId:', participantId, 'action:', action);
 
+    const session = await updateParticipantWithRetry(sessionId, participantId, action);
+    
     return NextResponse.json({ session });
   } catch (error) {
     console.error('Error updating participant:', error);

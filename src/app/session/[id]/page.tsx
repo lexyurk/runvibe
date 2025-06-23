@@ -41,6 +41,7 @@ export default function SessionPage() {
   const [session, setSession] = useState<RunSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [updatingParticipants, setUpdatingParticipants] = useState<Set<string>>(new Set());
   const params = useParams();
   const router = useRouter();
   const sessionId = params.id as string;
@@ -99,8 +100,18 @@ export default function SessionPage() {
   };
 
   const updateParticipant = async (participantId: string, action: 'addLap' | 'finish') => {
+    // Prevent concurrent updates for the same participant
+    if (updatingParticipants.has(participantId)) {
+      console.log('Participant update already in progress, skipping:', participantId);
+      return;
+    }
+
     try {
+      // Mark participant as being updated
+      setUpdatingParticipants(prev => new Set(prev).add(participantId));
+      
       console.log('Updating participant:', participantId, 'action:', action, 'current session status:', session?.status);
+      console.log('Current participant state before update:', session?.participants.find((p: Participant) => p.id === participantId));
       
       const response = await fetch('/api/participants', {
         method: 'PUT',
@@ -125,11 +136,19 @@ export default function SessionPage() {
       const { session: updatedSession } = await response.json();
       console.log('Participant updated, new session status:', updatedSession.status);
       console.log('Updated session participants:', updatedSession.participants.map((p: Participant) => ({ name: p.name, laps: p.lapsCompleted, finished: p.finished })));
+      console.log('Updated participant final state:', updatedSession.participants.find((p: Participant) => p.id === participantId));
       
       setSession(updatedSession);
     } catch (error) {
       console.error('Error updating participant:', error);
       alert('Failed to update participant');
+    } finally {
+      // Always remove participant from updating set
+      setUpdatingParticipants(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(participantId);
+        return newSet;
+      });
     }
   };
 
@@ -279,18 +298,28 @@ export default function SessionPage() {
                   {session.status === 'running' && !participant.finished && (
                     <button
                       onClick={() => updateParticipant(participant.id, 'addLap')}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors font-medium"
+                      disabled={updatingParticipants.has(participant.id)}
+                      className={`px-4 py-2 rounded-md transition-colors font-medium ${
+                        updatingParticipants.has(participant.id)
+                          ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
                     >
-                      +1 Lap
+                      {updatingParticipants.has(participant.id) ? 'Updating...' : '+1 Lap'}
                     </button>
                   )}
 
                   {session.status === 'running' && !participant.finished && (
                     <button
                       onClick={() => updateParticipant(participant.id, 'finish')}
-                      className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
+                      disabled={updatingParticipants.has(participant.id)}
+                      className={`px-4 py-2 rounded-md transition-colors ${
+                        updatingParticipants.has(participant.id)
+                          ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                          : 'bg-gray-600 text-white hover:bg-gray-700'
+                      }`}
                     >
-                      Finish
+                      {updatingParticipants.has(participant.id) ? 'Updating...' : 'Finish'}
                     </button>
                   )}
                 </div>
