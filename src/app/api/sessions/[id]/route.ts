@@ -48,22 +48,33 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
+    console.log('PUT: Updating session with ID:', id);
+    
     const session = await fetchSession(id);
     if (!session) {
+      console.log('PUT: Session not found for ID:', id);
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
     const updates = await request.json();
+    console.log('PUT: Updates to apply:', updates);
+    
     const updatedSession = { ...session, ...updates };
+    console.log('PUT: Updated session status:', updatedSession.status);
 
-    // Store updated session in Vercel Blob
-    await put(`sessions/${id}.json`, JSON.stringify(updatedSession), {
+    // Store updated session in Vercel Blob with overwrite
+    const result = await put(`sessions/${id}.json`, JSON.stringify(updatedSession), {
       access: 'public',
     });
-
+    
+    console.log('PUT: Blob update successful, URL:', result.url);
     return NextResponse.json({ session: updatedSession });
   } catch (error) {
-    console.error('Error updating session:', error);
-    return NextResponse.json({ error: 'Failed to update session' }, { status: 500 });
+    console.error('Error updating session - Full error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+    return NextResponse.json({ 
+      error: 'Failed to update session', 
+      details: error instanceof Error ? error.message : String(error) 
+    }, { status: 500 });
   }
 } 

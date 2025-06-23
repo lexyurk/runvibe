@@ -36,6 +36,7 @@ export default function SessionPage() {
     if (!session) return;
 
     try {
+      console.log('Starting session with ID:', sessionId);
       const response = await fetch(`/api/sessions/${sessionId}`, {
         method: 'PUT',
         headers: {
@@ -47,15 +48,20 @@ export default function SessionPage() {
         }),
       });
 
+      console.log('Start session response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error('Failed to start session');
+        const errorData = await response.json();
+        console.error('Start session error response:', errorData);
+        throw new Error(`Failed to start session: ${errorData.error || response.statusText}`);
       }
 
       const { session: updatedSession } = await response.json();
+      console.log('Session started successfully, new status:', updatedSession.status);
       setSession(updatedSession);
     } catch (error) {
       console.error('Error starting session:', error);
-      alert('Failed to start session');
+      alert(`Failed to start session: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
