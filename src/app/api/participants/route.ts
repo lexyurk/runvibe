@@ -67,6 +67,7 @@ export async function PUT(request: NextRequest) {
     // Store updated session
     await put(`sessions/${sessionId}.json`, JSON.stringify(session), {
       access: 'public',
+      allowOverwrite: true,
     });
 
     return NextResponse.json({ session });

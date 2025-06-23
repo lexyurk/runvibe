@@ -65,6 +65,7 @@ export async function PUT(
     // Store updated session in Vercel Blob with overwrite
     const result = await put(`sessions/${id}.json`, JSON.stringify(updatedSession), {
       access: 'public',
+      allowOverwrite: true,
     });
     
     console.log('PUT: Blob update successful, URL:', result.url);
