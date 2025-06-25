@@ -1,5 +1,6 @@
 # 🏃‍♀️ RunVibe
 
+
 A simple and efficient web app for tracking running laps during races, training sessions, and group fitness activities.
 
 ## Features
